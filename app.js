@@ -2,12 +2,26 @@ const express = require('express');
 const mongoose = require("mongoose");
 require("dotenv").config();
 
+const Book = require('./models/book');
+
 const app = express();
+app.use(express.urlencoded({ extended: true }))
+
 
 const MONGO_DB_URI = process.env.MONGO_DB_URL;
 
-app.get('/', (req, res) => {
-    res.send("Hello");
+app.get('/books', async (req, res) => {
+    const book = await Book.find();
+
+    return res.send(book);
+})
+
+app.get('/books/:id', async (req, res) => {
+    const id = req.params.id;
+
+    const book = await Book.findById(id);
+
+    return res.send(book);
 })
 
 mongoose
