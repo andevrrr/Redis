@@ -1,61 +1,37 @@
 const express = require('express');
 const mongoose = require("mongoose");
-const Redis = require("redis");
+const redis = require('redis');
 require("dotenv").config();
 
 const Book = require('./models/book');
 
-const redisClient = Redis.createClient();
+const client = redis.createClient();
 
-redisClient.on('error', err => {
-    console.error('Error connecting to Redis:', err);
-  });
-  
-  redisClient.on('connect', () => {
-    console.log('Connected to Redis');
-  });
-  
-  redisClient.on('end', () => {
-    console.log('Disconnected from Redis');
-  });
+(async () => {
+    await client.connect();
+})();
 
-// redisClient.connect()
-// .then(result => {
-//     console.log("Connected to redis client successfully!");
-// })
-// .catch(err => console.log(err));
+client.on('connect', () => console.log('Redis Client Connected'));
+client.on('error', (err) => console.log('Redis Client Connection Error', err));
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 
 const MONGO_DB_URI = process.env.MONGO_DB_URL;
-const def_exp = 3600;
+const def_exp = 60;
 
 app.get('/books', async (req, res) => {
-    try {
-        // Get cached books from Redis
-        redisClient.get('books', async (error, cachedBooks) => {
-            if (error) {
-                console.error(error);
-            }
 
-            if (cachedBooks != null) {
-                return res.json(JSON.parse(cachedBooks));
-            } else {
-                try {
-                    const books = await Book.find();
-                    redisClient.setex('books', def_exp, JSON.stringify(books)); // Use setex for expiration
-                    return res.json(books);
-                } catch (error) {
-                    console.error(error);
-                    return res.status(500).json({ message: 'Error fetching books from MongoDB.' });
-                }
-            }
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Internal server error.' });
-    }
+        const data = await client.get("books");
+
+        if (data !== null){
+            return res.json(JSON.parse(data));
+        } else {
+            const books = await Book.find();
+            client.setEx("books", def_exp, JSON.stringify(books))
+            res.json(books);
+        }
+
 });
 
 app.get('/books/:id', async (req, res) => {
@@ -63,6 +39,9 @@ app.get('/books/:id', async (req, res) => {
 
     const book = await Book.findById(id);
 
+    res.json(book);
+
+    // Handle the response here...
 })
 
 mongoose
